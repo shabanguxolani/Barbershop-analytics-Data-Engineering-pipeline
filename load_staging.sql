@@ -214,8 +214,8 @@ SELECT
     COALESCE(NULLIF(TRIM(experience_level), ''), 'Unknown'),
     CASE
         WHEN experience_level = 'Junior' THEN 'Entry Level'
-        WHEN experience_level = 'Intermediate' THEN 'Mid Level'
-        WHEN experience_level IN ('Senior', 'Master') THEN 'Experienced'
+        WHEN experience_level = 'Mid-Level' THEN 'Mid Level'
+        WHEN experience_level IN ('Master Barber', 'Senior') THEN 'Experienced'
         ELSE 'Unknown'
     END,
     TRY_CONVERT(DATE, hire_date),
@@ -231,41 +231,64 @@ GO
 
 TRUNCATE TABLE staging.customers;
 
-INSERT INTO staging.customers (
-    customer_id, first_name, last_name, full_name, phone_number,
-    email, email_domain, gender, gender_group, city, province,
-    region, signup_date, signup_year, source_file_name, loaded_at
+WITH CleanedData AS (
+    SELECT
+        COALESCE(NULLIF(UPPER(TRIM(customer_id)), ''), 'UNKNOWN') AS customer_id,
+        COALESCE(NULLIF(TRIM(first_name), ''), 'UNKNOWN') AS first_name,
+        COALESCE(NULLIF(TRIM(last_name), ''), 'UNKNOWN') AS last_name,
+        COALESCE(NULLIF(TRIM(phone_number), ''), 'UNKNOWN') AS phone_number,
+        COALESCE(NULLIF(LOWER(TRIM(email)), ''), 'UNKNOWN') AS email,
+        COALESCE(NULLIF(TRIM(gender), ''), 'UNKNOWN') AS gender,
+        COALESCE(NULLIF(TRIM(city), ''), 'UNKNOWN') AS city,
+        COALESCE(NULLIF(TRIM(province), ''), 'UNKNOWN') AS province,
+        TRY_CONVERT(DATETIME, signup_date) AS signup_date,
+        source_file_name,
+        loaded_at
+    FROM bronze.customers_raw
 )
+
+INSERT INTO staging.customers (
+    customer_id, first_name, last_name, full_name, phone_number, email, email_domain,
+    gender, gender_group, city, province, region, signup_date, signup_year,
+    source_file_name, loaded_at
+)
+
 SELECT
-    COALESCE(NULLIF(UPPER(TRIM(customer_id)), ''), 'UNKNOWN'),
-    COALESCE(NULLIF(TRIM(first_name), ''), 'Unknown'),
-    COALESCE(NULLIF(TRIM(last_name), ''), 'Customer'),
-    CONCAT(COALESCE(NULLIF(TRIM(first_name), ''), 'Unknown'), ' ', COALESCE(NULLIF(TRIM(last_name), ''), 'Customer')),
-    NULLIF(TRIM(phone_number), ''),
-    LOWER(NULLIF(TRIM(email), '')),
-    CASE 
-        WHEN email IS NOT NULL AND CHARINDEX('@', email) > 0 
-        THEN SUBSTRING(email, CHARINDEX('@', email) + 1, LEN(email))
-        ELSE 'Unknown'
-    END,
-    COALESCE(NULLIF(TRIM(gender), ''), 'Unknown'),
+    customer_id,
+    first_name,
+    last_name,
+    CONCAT(first_name, ' ', last_name) AS full_name,
+    phone_number,
+    email,
+
     CASE
-        WHEN gender IN ('Male', 'M') THEN 'Male'
-        WHEN gender IN ('Female', 'F') THEN 'Female'
-        ELSE 'Other'
-    END,
-    COALESCE(NULLIF(TRIM(city), ''), 'Unknown'),
-    COALESCE(NULLIF(TRIM(province), ''), 'Unknown'),
+        WHEN email LIKE '%@%' THEN SUBSTRING(email, CHARINDEX('@', email) + 1, LEN(email))
+        ELSE 'UNKNOWN'
+    END AS email_domain,
+
+    gender,
+
     CASE
-        WHEN province = 'Gauteng' THEN 'Inland'
-        WHEN province IN ('Western Cape', 'KwaZulu-Natal') THEN 'Coastal'
+        WHEN gender LIKE 'M%' THEN 'Male'
+        WHEN gender LIKE 'F%' THEN 'Female'
         ELSE 'Other'
-    END,
-    TRY_CONVERT(DATE, signup_date),
-    DATEPART(YEAR, TRY_CONVERT(DATE, signup_date)),
+    END AS gender_group,
+
+    city,
+    province,
+
+    CASE
+        WHEN province IN ('Mpumalanga', 'Gauteng', 'Limpopo', 'Free State', 'North West', 'Northern Cape')
+            THEN 'Inland'
+        WHEN province IN ('KwaZulu-Natal', 'Western Cape', 'Eastern Cape')
+            THEN 'Coastal'
+        ELSE 'Other'
+    END AS region,
+
+    signup_date,
+    YEAR(signup_date) AS signup_year,
     source_file_name,
     loaded_at
-FROM bronze.customers_raw;
-GO
 
+FROM CleanedData;
 -- SELECT * FROM staging.customers

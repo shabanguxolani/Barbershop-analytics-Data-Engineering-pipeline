@@ -46,7 +46,7 @@ def get_connection():
         f"SERVER={SQL_SERVER};"
         f"DATABASE={SQL_DATABASE};"
         "Trusted_Connection=yes;"
-    )
+    )  
     return pyodbc.connect(connection_string)
 
 def truncate_table(table_name: str):
@@ -55,7 +55,6 @@ def truncate_table(table_name: str):
         cursor = conn.cursor()
         cursor.execute(f"TRUNCATE TABLE {table_name}")
         conn.commit()
-
 
 def load_csv_to_bronze(file_path, table_name):
     print(f"Loading {file_path} into {table_name}")
@@ -93,7 +92,6 @@ def main():
             file_path=config["file_path"],
             table_name=config["table_name"],
         )
-
 
 if __name__ == "__main__":
     main()
